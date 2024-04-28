@@ -1,0 +1,164 @@
+{
+	"name": "pl_transform_adb",
+	"properties": {
+		"activities": [
+			{
+				"name": "act_set_var_job_id",
+				"type": "SetVariable",
+				"dependsOn": [],
+				"policy": {
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"variableName": "job_id",
+					"value": {
+						"value": "@formatDateTime(convertFromUtc(utcNow(),'Asia/Kolkata'),'yyyyMMddHHmmss')",
+						"type": "Expression"
+					}
+				}
+			},
+			{
+				"name": "act_lookup_metadata_entry",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "act_set_var_job_id",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzurePostgreSqlSource",
+						"query": {
+							"value": "INSERT INTO public.formulaone_metadata_tbl\n(job_id, job_name, task_name, start_time, status)\nVALUES('@{variables('job_id')}', 'pl_transform_adb', 'adb_gold', '@{formatDateTime(convertFromUtc(utcNow(),'Asia/Kolkata'),'yyyy-MM-dd HH:mm:ss')}', 'In-progress');\n\nSELECT job_id, job_name, task_name, start_time, end_time, status\nFROM public.formulaone_metadata_tbl;",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "ds_AzurePostgreSqlTable",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "act_adb_transform",
+				"type": "DatabricksNotebook",
+				"dependsOn": [
+					{
+						"activity": "act_lookup_metadata_entry",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"notebookPath": "/Repos/raj.ravi96@outlook.com/formulaone/transform-formulaone/all_transform"
+				},
+				"linkedServiceName": {
+					"referenceName": "ls_AzureDatabricks",
+					"type": "LinkedServiceReference"
+				}
+			},
+			{
+				"name": "act_lookup_metadata_update",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "act_adb_transform",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzurePostgreSqlSource",
+						"query": {
+							"value": "UPDATE public.formulaone_metadata_tbl\nSET end_time='@{formatDateTime(convertFromUtc(utcNow(),'Asia/Kolkata'),'yyyy-MM-dd HH:mm:ss')}', status='Completed'\nWHERE job_id='@{variables('job_id')}';\n\nSELECT job_id, job_name, task_name, start_time, end_time, status\nFROM public.formulaone_metadata_tbl;",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "ds_AzurePostgreSqlTable",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": true
+				}
+			},
+			{
+				"name": "act_lookup_metadata_update_failure",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "act_adb_transform",
+						"dependencyConditions": [
+							"Failed",
+							"Skipped"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzurePostgreSqlSource",
+						"query": {
+							"value": "UPDATE public.formulaone_metadata_tbl\nSET end_time='@{formatDateTime(convertFromUtc(utcNow(),'Asia/Kolkata'),'yyyy-MM-dd HH:mm:ss')}', status='Failed'\nWHERE job_id='@{variables('job_id')}';\n\nSELECT job_id, job_name, task_name, start_time, end_time, status\nFROM public.formulaone_metadata_tbl;",
+							"type": "Expression"
+						},
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "ds_AzurePostgreSqlTable",
+						"type": "DatasetReference"
+					}
+				}
+			}
+		],
+		"variables": {
+			"job_id": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2024-04-28T10:28:37Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

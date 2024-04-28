@@ -1,0 +1,25 @@
+{
+	"name": "ds_season_rest",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_restservice_base_url",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"relative_url": {
+				"type": "String",
+				"defaultValue": "seasons.json?limit=75"
+			}
+		},
+		"annotations": [],
+		"type": "RestResource",
+		"typeProperties": {
+			"relativeUrl": {
+				"value": "@dataset().relative_url",
+				"type": "Expression"
+			}
+		},
+		"schema": []
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
